@@ -64,34 +64,16 @@ public class CameraToFile {
 
     public static void main(String[] args) throws Exception {
         Gst.init();
-        String inputFileLocation = args[0];
-        String outputFileLocation = args[1];
-        File soundFile = new File(inputFileLocation);
-        FileInputStream inStream = null;
+
+        String outputFileLocation = args[0];
         FileChannel output =
             new FileOutputStream(outputFileLocation).getChannel();
         final MainLoop loop = new MainLoop();
 
-        if (soundFile.exists()){
-            try {
-                System.out.println("Read media file.");
-                long fileSize = soundFile.length();
-                soundBytes = new byte[(int)fileSize];
-                inStream = new FileInputStream(soundFile);
-                int byteCount = inStream.read(soundBytes);
-                System.out.println("Number of bytes read: " + byteCount);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-        }
-
-        AppSrc source = (AppSrc) ElementFactory.make("appsrc", "app-source");
+        Element source = ElementFactory.make("audiotestsrc", "audio");
         Element decoder = ElementFactory.make("decodebin", "decoder");
         Element converter = ElementFactory.make("audioconvert", "converter");
         // The encoder element determines your output format.
-        Element encoder = ElementFactory.make("wavenc", "wavenc");
-        //Element encoder = ElementFactory.make("lamemp3enc", "mp3enc");
         AppSink sink = (AppSink)ElementFactory.make("appsink", "audio-output");
 
         Pipeline pipe = new Pipeline();
@@ -116,30 +98,6 @@ public class CameraToFile {
                 System.out.println("Error code: " + code);
                 System.out.println("Message: " + message);
                 loop.quit();
-            }
-        });
-
-        source.set("emit-signals", true);
-        source.connect(new AppSrc.NEED_DATA() {
-
-            private final ByteBuffer bb = ByteBuffer.wrap(soundBytes);
-
-            @Override
-            public void needData(AppSrc elem, int size) {
-                if (bb.hasRemaining()) {
-                    System.out.println("needData: size = " + size);
-                    byte[] tempBuffer;
-                    Buffer buf;
-                    int copyLength = (bb.remaining() >= size) ? size : bb.remaining();
-                    tempBuffer = new byte[copyLength];
-                    buf = new Buffer(copyLength);
-                    bb.get(tempBuffer);
-                    System.out.println("Temp Buffer remaining bytes: " + bb.remaining());
-                    buf.map(true).put(ByteBuffer.wrap(tempBuffer));
-                    elem.pushBuffer(buf);
-                } else {
-                    elem.endOfStream();
-                }
             }
         });
 
@@ -180,10 +138,9 @@ public class CameraToFile {
             }
         });
 
-        pipe.addMany(source, decoder, converter, encoder, sink);
+        pipe.addMany(source, decoder, converter, sink);
         source.link(decoder);
-        converter.link(encoder);
-        encoder.link(sink);
+        decoder.link(sink);
         decoder.connect(new Element.PAD_ADDED() {
 
             @Override
