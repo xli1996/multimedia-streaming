@@ -52,7 +52,7 @@ public class WritingToFile {
             }
         });
 
-        String outputFileLocation = "output.avi";
+        String outputFileLocation = "output.x263";
         FileChannel output = new FileOutputStream(outputFileLocation).getChannel();
         AppSink sink = (AppSink)ElementFactory.make("appsink", "video-output");
 
@@ -101,7 +101,7 @@ public class WritingToFile {
          */
 
         Bin bin = Gst.parseBinFromDescription(
-            "autovideosrc ! x264enc ! avimux ",
+            "autovideosrc ! capsfilter caps=video/x-raw,width=640,height=480! x264enc ",
             true);
 
         pipe.addMany(bin, sink);
