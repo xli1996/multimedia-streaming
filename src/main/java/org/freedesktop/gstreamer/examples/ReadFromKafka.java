@@ -27,6 +27,7 @@ public class ReadFromKafka {
 
     public static void main(String[] args) throws Exception {
         kafkaConsumer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", topic, "hackday");
+        kafkaConsumer.seekToEnd(topic, 0);
         // get the output stream from the socket.
         Gst.init();
 
