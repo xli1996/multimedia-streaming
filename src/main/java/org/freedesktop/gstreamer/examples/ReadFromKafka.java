@@ -23,10 +23,11 @@ public class ReadFromKafka {
     private static Pipeline pipe;
     private static byte[] videoBytes = null;
     private static KafkaConsumerWrapper kafkaConsumer = new KafkaConsumerWrapper();
+    private static String topic = "live-stream";
 
     public static void main(String[] args) throws Exception {
-        kafkaConsumer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", "live-stream", "hackday");
-        kafkaConsumer.seek("live-stream", 0, 0);
+        kafkaConsumer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", topic, "hackday");
+        kafkaConsumer.seek(topic, 0, 0);
         // get the output stream from the socket.
         Gst.init();
 
@@ -99,32 +100,13 @@ public class ReadFromKafka {
                 }
 
                 if (records.count() > 0)
-                    kafkaConsumer.commitOffset("live-stream", partition, offset + 1);
+                    kafkaConsumer.commitOffset(topic, partition, offset + 1);
 
 
                 Buffer buf;
                 buf = new Buffer(copySize);
                 buf.map(true).put(ByteBuffer.wrap(tempBuffer));
                 elem.pushBuffer(buf);
-//                if (bb.hasRemaining()) {
-//                    System.out.println("needData: size = " + size);
-//                    byte[] tempBuffer;
-//                    Buffer buf;
-//                    int copyLength = (bb.remaining() >= size) ? size : bb.remaining() - 1;
-//                    tempBuffer = new byte[copyLength];
-//                    buf = new Buffer(copyLenth);
-//                    bb.get(tempBuffer);
-//                    System.out.println("Temp Buffer remaining bytes: " + bb.remaining());
-//
-//                    buf.map(true).put(ByteBuffer.wrap(tempBuffer));
-//                    elem.pushBuffer(buf);
-//                    if (new java.util.Random().nextInt() % 20 == 0) {
-//                        byte[] tempBuffer1 = new byte[1];
-//                        bb.get(tempBuffer1);
-//                    }
-//                } else {
-//                    elem.endOfStream();
-//                }
             }
         });
 
