@@ -12,18 +12,17 @@
  package org.freedesktop.gstreamer.examples;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.io.File;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
-
+import javax.swing.JFrame;
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.BufferFlags;
@@ -34,9 +33,9 @@ import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.Sample;
 import org.freedesktop.gstreamer.Structure;
+import org.freedesktop.gstreamer.Version;
 import org.freedesktop.gstreamer.elements.AppSink;
 import org.freedesktop.gstreamer.elements.AppSrc;
-import org.freedesktop.gstreamer.elements.BaseSink;
 import org.freedesktop.gstreamer.elements.PlayBin;
 import org.freedesktop.gstreamer.event.EOSEvent;
 import org.freedesktop.gstreamer.glib.NativeFlags;
@@ -49,7 +48,7 @@ import org.freedesktop.gstreamer.glib.NativeFlags;
  * @author Tend Wong
  */
 public class TestProcessVideoMP4ToMP4 {
-	private static boolean sendData = false;
+	private static boolean sendData = true;
 	private static ArrayBlockingQueue<Buffer> videoQueue = new ArrayBlockingQueue<Buffer>(1);
 	
 	private static StringBuffer videoCaps = new StringBuffer();
@@ -68,37 +67,45 @@ public class TestProcessVideoMP4ToMP4 {
 	private static ProcessingThread processingThread;
 
 	public static void main(String args[]) throws Exception {
-		Gst.init();
+		Gst.init(new Version(1,14));
 		
 		System.out.println("GST finished initialization.");
 		
 		Scanner s = new Scanner(System.in);
 
-        Bin videoBin = Gst.parseBinFromDescription("appsink name=videoAppSink", true);
+		Bin videoBin = Gst.parseBinFromDescription("appsink name=videoAppSink", true);
 
-        AppSink videoAppSink = (AppSink) videoBin.getElementByName("videoAppSink");
-        videoAppSink.set("emit-signals", true);
-        videoAppSink.set("async", true);
-        
-        AppSinkListener videoAppSinkListener = new AppSinkListener(processingQueue,videoCaps,gotCaps);
-        videoAppSink.connect((AppSink.NEW_SAMPLE) videoAppSinkListener);   
+		AppSink videoAppSink = (AppSink) videoBin.getElementByName("videoAppSink");
+		videoAppSink.set("emit-signals", true);
+		videoAppSink.set("async", true);
 
-        StringBuilder caps = new StringBuilder("video/x-raw,pixel-aspect-ratio=1/1,");
-        if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
-            caps.append("format=BGRx");
-        else
-            caps.append("format=xRGB");
-        videoAppSink.setCaps(new Caps(caps.toString()));
-        
-        PlayBin playbin = new PlayBin("playbin");
-        playbin.setURI((new File("<your mp4 file path>.mp4")).toURI());
-        playbin.setVideoSink(videoBin);
-        playbin.setAudioSink(null);
+//		AppSinkListener videoAppSinkListener = new AppSinkListener(processingQueue,videoCaps,gotCaps);
+//		videoAppSink.connect((AppSink.NEW_SAMPLE) videoAppSinkListener);
+    SimpleVideoComponent vc = new SimpleVideoComponent(videoAppSink);
+    JFrame window = new JFrame("Video Player");
+    window.add(vc);
+    vc.setPreferredSize(new Dimension(800, 600));
+    window.pack();
+    window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    window.setVisible(true);
+    //vc.getElement().connect((AppSink.NEW_SAMPLE) videoAppSinkListener);
 
-        playbin.getBus().connect((Bus.EOS) (source) -> {
+		StringBuilder caps = new StringBuilder("video/x-raw,pixel-aspect-ratio=1/1,");
+		if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
+				caps.append("format=BGRx");
+		else
+				caps.append("format=xRGB");
+		videoAppSink.setCaps(new Caps(caps.toString()));
+
+		PlayBin playbin = new PlayBin("playbin");
+		playbin.setURI((new File("SampleVideo_1280x720_1mb.mp4")).toURI());
+		playbin.setVideoSink(videoBin);
+		playbin.setAudioSink(null);
+
+		playbin.getBus().connect((Bus.EOS) (source) -> {
 			System.out.println("Received the EOS on the playbin!!!");
 			gotEOSPlaybin.release();       	
-        });
+		});
 		       
 //		playbin.getBus().connect((Bus.ERROR) (source, code, message) -> {
 //			System.out.println("Error Source: " + source.getName());
@@ -109,14 +116,14 @@ public class TestProcessVideoMP4ToMP4 {
 //			System.out.println("Bus Message : " + message.getStructure());
 //		});
         
-        processData = true;
-        processingThread = new ProcessingThread();
-        processingThread.setDaemon(true);
-        processingThread.start();
+		processData = true;
+		processingThread = new ProcessingThread();
+		processingThread.setDaemon(true);
+		processingThread.start();
         
 		gotEOSPlaybin.drainPermits();
-        gotCaps.drainPermits();
-        playbin.play();
+    gotCaps.drainPermits();
+    playbin.play();
 		
 		System.out.println("Processing of MP4 started, please wait...");
 				
@@ -134,12 +141,12 @@ public class TestProcessVideoMP4ToMP4 {
 			"! filesink name=filesink "
 		);			
 
-        videoAppSrc = (AppSrc) pipeline.getElementByName("videoAppSrc");
+		videoAppSrc = (AppSrc) pipeline.getElementByName("videoAppSrc");
 		videoAppSrc.setCaps(new Caps(videoCaps.toString()));
-        videoAppSrc.set("emit-signals", true);
+		videoAppSrc.set("emit-signals", true);
 
-        videoAppSrcListener = new AppSrcListener(videoQueue,canSend);
-        videoAppSrc.connect((AppSrc.NEED_DATA) videoAppSrcListener);   
+		videoAppSrcListener = new AppSrcListener(videoQueue,canSend);
+		videoAppSrc.connect((AppSrc.NEED_DATA) videoAppSrcListener);
 
 		pipeline.getBus().connect((Bus.EOS) (source) -> {
 			System.out.println("Received the EOS on the pipeline!!!");
@@ -155,14 +162,14 @@ public class TestProcessVideoMP4ToMP4 {
 //			System.out.println("Bus Message : "+message.getStructure());			
 //		});
 		
-		BaseSink filesink = (BaseSink) pipeline.getElementByName("filesink");
+//		BaseSink filesink = (BaseSink) pipeline.getElementByName("filesink");
 		
 		while (true) {
 			System.out.println("Press ENTER to start processing footage from the MP4, or type 'QUIT' and press ENTER to exit...");
 			if (!s.nextLine().isEmpty())
 				break;
 	
-			filesink.set("location", "processed"+System.currentTimeMillis()+".mp4");
+//			filesink.set("location", "processed"+System.currentTimeMillis()+".mp4");
 	
 			clearQueue(videoQueue);
 			clearQueue(processingQueue);
@@ -227,12 +234,12 @@ public class TestProcessVideoMP4ToMP4 {
             if (!capsSet) {
             	caps.append(sample.getCaps().toString());
             	
-                Structure capsStruct = sample.getCaps().getStructure(0);
-                videoWidth = capsStruct.getInteger("width");
-                videoHeight = capsStruct.getInteger("height");
-        		numPixels = videoWidth * videoHeight;
+							Structure capsStruct = sample.getCaps().getStructure(0);
+							videoWidth = capsStruct.getInteger("width");
+							videoHeight = capsStruct.getInteger("height");
+        			numPixels = videoWidth * videoHeight;
 
-                capsSet = true;
+        			capsSet = true;
             	gotCaps.release();
             }
 
@@ -240,20 +247,20 @@ public class TestProcessVideoMP4ToMP4 {
             	Buffer srcBuffer = sample.getBuffer();
             	ByteBuffer bb = srcBuffer.map(false);
 
-        		int[] pixels = new int[numPixels];
-        		bb.asIntBuffer().get(pixels, 0, numPixels);
+							int[] pixels = new int[numPixels];
+							bb.asIntBuffer().get(pixels, 0, numPixels);
 
-        		FrameInfo info = new FrameInfo();
-        		info.setCapacity(bb.capacity());
-        		info.setPixels(pixels);
-        		info.setFlags(NativeFlags.toInt(srcBuffer.getFlags()));
-        		info.setDuration(srcBuffer.getDuration());
-        		info.setOffset(srcBuffer.getOffset());
-        		info.setOffsetEnd(srcBuffer.getOffsetEnd());
-        		info.setDecodeTimestamp(srcBuffer.getDecodeTimestamp());
-        		info.setPresentationTimestamp(srcBuffer.getPresentationTimestamp());
-            	
-        		try {queue.put(info);} catch (Exception e) {}
+							FrameInfo info = new FrameInfo();
+							info.setCapacity(bb.capacity());
+							info.setPixels(pixels);
+							info.setFlags(NativeFlags.toInt(srcBuffer.getFlags()));
+							info.setDuration(srcBuffer.getDuration());
+							info.setOffset(srcBuffer.getOffset());
+							info.setOffsetEnd(srcBuffer.getOffsetEnd());
+							info.setDecodeTimestamp(srcBuffer.getDecodeTimestamp());
+							info.setPresentationTimestamp(srcBuffer.getPresentationTimestamp());
+
+							try {queue.put(info);} catch (Exception e) {}
         		
             	srcBuffer.unmap();
             }
