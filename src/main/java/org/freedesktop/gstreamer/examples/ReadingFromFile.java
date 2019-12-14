@@ -4,12 +4,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Bus;
+import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.GstObject;
+import org.freedesktop.gstreamer.Pad;
+import org.freedesktop.gstreamer.PadLinkException;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.elements.AppSrc;
 import org.freedesktop.gstreamer.lowlevel.MainLoop;
@@ -99,12 +101,38 @@ public class ReadingFromFile {
         });
 
 
-        Bin bin = Gst.parseBinFromDescription(
-            "avidemux ! xvimagesink",
-            true);
+//        Bin bin = Gst.parseBinFromDescription(
+//            "decodebin ! videoconvert ! autovideosink",
+//            true);
 
-        pipe.addMany(source, bin);
-        Pipeline.linkMany(source, bin);
+        Element decoder = ElementFactory.make("decodebin", "decoder");
+        Element converter = ElementFactory.make("videoconvert", "converter");
+        // The encoder element determines your output format.
+        Element display = ElementFactory.make("autovideosink", "video-output");
+
+        pipe.addMany(source, decoder, converter, display);
+        //Pipeline.linkMany(source, decoder, converter, display);
+        source.link(decoder);
+        decoder.link(converter);
+        converter.link(display);
+
+        decoder.connect(new Element.PAD_ADDED() {
+
+            @Override
+            public void padAdded(Element element, Pad pad) {
+                System.out.println("Dynamic pad created, linking decoder/converter");
+                System.out.println("Pad name: " + pad.getName());
+                System.out.println("Pad type: " + pad.getTypeName());
+                Pad sinkPad = converter.getStaticPad("sink");
+                try {
+                    pad.link(sinkPad);
+                    System.out.println("Pad linked.");
+                } catch (PadLinkException ex) {
+                    System.out.println("Pad link failed : " + ex.getLinkResult());
+                }
+            }
+
+        });
 
         System.out.println("Playing...");
         pipe.play();
