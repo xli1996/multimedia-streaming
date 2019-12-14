@@ -5,7 +5,7 @@ import numpy as np
 
 from kafka import KafkaConsumer, KafkaProducer
 
-server = "ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093"
+server = "see slack"
 video_name = "video-from-kafka.avi"
 # def producer():
 #     producer = KafkaProducer(bootstrap_servers=server)
