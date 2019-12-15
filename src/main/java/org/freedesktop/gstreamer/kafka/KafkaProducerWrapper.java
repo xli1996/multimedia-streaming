@@ -20,8 +20,8 @@ public class KafkaProducerWrapper {
     producerProperties.put("bootstrap.servers", kafkaBootstrapServers);
     producerProperties.put("acks", "all");
     producerProperties.put("retries", 0);
-    producerProperties.put("batch.size", 16384);
-    producerProperties.put("linger.ms", 1);
+    producerProperties.put("batch.size", 32000);
+    producerProperties.put("linger.ms", 50);
     producerProperties.put("buffer.memory", 33554432);
     producerProperties.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
     producerProperties.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
