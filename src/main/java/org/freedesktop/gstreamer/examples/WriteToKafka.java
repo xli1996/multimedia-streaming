@@ -25,6 +25,7 @@ public class WriteToKafka {
     public static void main(String[] args) throws Exception {
 
         kafkaProducer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093");
+
         Gst.init();
 
         final MainLoop loop = new MainLoop();
@@ -69,13 +70,11 @@ public class WriteToKafka {
                 ByteBuffer bytes = sample.getBuffer().map(false);
                 try {
                     //output.write(bytes);
-                    while(bytes.hasRemaining()) {
-                        int copy = Math.min(bytes.remaining(), 4096);
-                        byte[] buf = new byte[copy];
-                        bytes.get(buf);
-                        kafkaProducer.send("live-stream", buf);
-                        System.out.println("Writing " + copy + " to cluster");
-                    }
+                    int copy = bytes.remaining();
+                    byte[] buf = new byte[copy];
+                    bytes.get(buf);
+                    kafkaProducer.send("live-stream", buf);
+                    System.out.println("Writing " + copy + " to cluster");
                 } catch (Exception e) {
                     System.err.println(e);
                 }

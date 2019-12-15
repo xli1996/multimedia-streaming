@@ -34,8 +34,8 @@ public class ReadFromKafka {
         final KafkaConsumerWrapper kafkaConsumer = new KafkaConsumerWrapper();
 
         kafkaConsumer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", topic, "hackday");
-//        kafkaConsumer.seekToEnd(topic, 0);
-        kafkaConsumer.seek(topic, 0, 0);
+        kafkaConsumer.seekToEnd(topic, 0);
+//        kafkaConsumer.seek(topic, 0, 0);
         // get the output stream from the socket.
         Gst.init();
 
@@ -87,9 +87,12 @@ public class ReadFromKafka {
 
 
 
+
         AppSrc source = (AppSrc)ElementFactory.make("appsrc", "app-source");
         source.set("emit-signals", true);
         source.connect(new AppSrc.NEED_DATA() {
+
+          final int[] offsetWithinRecord = new int[]{0};;
 
             @Override
             public void needData(AppSrc elem, int size) {
@@ -110,27 +113,38 @@ public class ReadFromKafka {
                 while (currentRecord.hasNext()) {
                     ConsumerRecord<String, byte[]> record = currentRecord.next();
                     currentSize += record.value().length;
-                    if (currentSize > size)
-//                        copySize = size;
-                        break;
-                    ;
+                    if (currentSize > size) {
+                      copySize = size;
+                      break;
+                    }
                     copySize = currentSize;
                 }
 
                 byte[] tempBuffer = new byte[copySize];
 
-                currentSize = 0;
-                int preCopySize = 0;
+                int bufferOffset = 0;
                 while (!consumerRecords.isEmpty()) {
                     ConsumerRecord<String, byte[]> record = consumerRecords.peek();
-                    long recordLength = record.value().length;
-                    currentSize += record.value().length;
-                    if (currentSize > size)
-                        break;
-                    System.arraycopy(record.value(), 0, tempBuffer, preCopySize,
-                        record.value().length);
-                    consumerRecords.poll();
-                    preCopySize = currentSize;
+                    int recordLength = record.value().length;
+                    int futureOffset = bufferOffset + recordLength;
+                    int numCopy = futureOffset > copySize ? copySize - bufferOffset : recordLength;
+                    numCopy = Math.min(numCopy, record.value().length - offsetWithinRecord[0]);
+                    System.arraycopy(record.value(), offsetWithinRecord[0], tempBuffer, bufferOffset,
+                        numCopy);
+                    if (record.value().length <= offsetWithinRecord[0] + numCopy) {
+                      //we have copied everything from the record
+                      //go to the next one
+                      consumerRecords.poll();
+                      offsetWithinRecord[0] = 0;
+                    } else {
+                      offsetWithinRecord[0] += numCopy;
+                    }
+
+                    bufferOffset += numCopy;
+                    if (bufferOffset >= tempBuffer.length) {
+                      //the buffer is full do not copy more
+                      break;
+                    }
                 }
 
                 Buffer buf;
