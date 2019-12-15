@@ -1,6 +1,12 @@
 package org.freedesktop.gstreamer.examples;
 
 import java.nio.ByteBuffer;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.freedesktop.gstreamer.Bin;
@@ -22,14 +28,36 @@ public class ReadFromKafka {
 
     private static Pipeline pipe;
     private static byte[] videoBytes = null;
-    private static KafkaConsumerWrapper kafkaConsumer = new KafkaConsumerWrapper();
     private static String topic = "live-stream";
 
     public static void main(String[] args) throws Exception {
+        final KafkaConsumerWrapper kafkaConsumer = new KafkaConsumerWrapper();
+
         kafkaConsumer.initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", topic, "hackday");
-        kafkaConsumer.seekToEnd(topic, 0);
+//        kafkaConsumer.seekToEnd(topic, 0);
+        kafkaConsumer.seek(topic, 0, 0);
         // get the output stream from the socket.
         Gst.init();
+
+        final ConcurrentLinkedQueue<ConsumerRecord<String, byte[]>>
+            consumerRecords = new ConcurrentLinkedQueue();
+
+        Runnable kafkaPolling = () -> {
+            ConsumerRecords<String, byte[]> records;
+            records = kafkaConsumer.receive();
+            if (records.count() > 0) {
+                records.forEach(record -> {
+                    consumerRecords.add(record);
+                });
+                synchronized (consumerRecords) {
+                    consumerRecords.notify();
+                }
+            }
+        };
+
+        ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+        ScheduledFuture<?> scheduledFuture = ses.scheduleAtFixedRate(kafkaPolling, 0, 100, TimeUnit.MILLISECONDS);
+
 
         final MainLoop loop = new MainLoop();
         pipe = new Pipeline();
@@ -65,18 +93,25 @@ public class ReadFromKafka {
 
             @Override
             public void needData(AppSrc elem, int size) {
-                ConsumerRecords<String, byte[]> records;
-                while(true) {
-                    records = kafkaConsumer.receive();
-                    if (records.count() != 0)
-                        break;
+                //no new record yet, wait the the g
+                if (consumerRecords.isEmpty()) {
+                    synchronized (consumerRecords) {
+                        try {
+                            consumerRecords.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
 
                 int copySize = 0;
                 int currentSize = 0;
-                for (ConsumerRecord<String, byte[]> record : records) {
+                Iterator<ConsumerRecord<String, byte[]>> currentRecord = consumerRecords.iterator();
+                while (currentRecord.hasNext()) {
+                    ConsumerRecord<String, byte[]> record = currentRecord.next();
                     currentSize += record.value().length;
                     if (currentSize > size)
+//                        copySize = size;
                         break;
                     ;
                     copySize = currentSize;
@@ -86,22 +121,17 @@ public class ReadFromKafka {
 
                 currentSize = 0;
                 int preCopySize = 0;
-                long offset = -1;
-                int partition = 0;
-                for (ConsumerRecord<String, byte[]> record : records) {
+                while (!consumerRecords.isEmpty()) {
+                    ConsumerRecord<String, byte[]> record = consumerRecords.peek();
+                    long recordLength = record.value().length;
                     currentSize += record.value().length;
                     if (currentSize > size)
                         break;
                     System.arraycopy(record.value(), 0, tempBuffer, preCopySize,
                         record.value().length);
+                    consumerRecords.poll();
                     preCopySize = currentSize;
-                    offset = record.offset();
-                    partition = record.partition();
                 }
-
-                if (records.count() > 0)
-                    kafkaConsumer.commitOffset(topic, partition, offset + 1);
-
 
                 Buffer buf;
                 buf = new Buffer(copySize);
@@ -114,7 +144,6 @@ public class ReadFromKafka {
         Bin bin = Gst.parseBinFromDescription(
             "h264parse ! avdec_h264 ! videoconvert ! autovideosink",
             true);
-//        Element fakesink = ElementFactory.make("fakesink", "fakesink");
 
         pipe.addMany(source, bin);
         Pipeline.linkMany(source, bin);
@@ -124,10 +153,12 @@ public class ReadFromKafka {
         pipe.play();
         System.out.println("Running...");
         loop.run();
-           System.out.println("Returned, stopping playback");
+        System.out.println("Returned, stopping playback");
         pipe.stop();
         Gst.deinit();
         Gst.quit();
+
+        scheduledFuture.cancel(true);
     }
 
 }

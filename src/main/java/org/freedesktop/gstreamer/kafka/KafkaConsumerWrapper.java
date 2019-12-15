@@ -23,11 +23,11 @@ public class KafkaConsumerWrapper {
     consumerProperties.put("group.id", zookeeperGroupId);
     consumerProperties.put("zookeeper.session.timeout.ms", "6000");
     consumerProperties.put("zookeeper.sync.time.ms","2000");
-    consumerProperties.put("auto.commit.enable", "false");  //manually commit the offset
+    consumerProperties.put("auto.commit.enable", "true");  //manually commit the offset
     consumerProperties.put("auto.commit.interval.ms", "10000");
     consumerProperties.put("max.poll.interval.ms", 10000000);
     consumerProperties.put("consumer.timeout.ms", "-1");
-    consumerProperties.put("max.poll.records", "1");
+    consumerProperties.put("max.poll.records", "500");
     consumerProperties.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
     consumerProperties.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 
