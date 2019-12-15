@@ -88,6 +88,8 @@ public class ReadFromKafka {
 
     AppSrc source = (AppSrc) ElementFactory.make("appsrc", "app-source");
     source.set("emit-signals", true);
+//    source.set("blocksize", 1048576);
+    source.set("blocksize", 4096);
     source.connect(new AppSrc.NEED_DATA() {
 
       final int[] offsetWithinRecord = new int[]{0};

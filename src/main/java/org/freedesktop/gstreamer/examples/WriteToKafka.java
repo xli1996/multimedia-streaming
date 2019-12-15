@@ -59,10 +59,12 @@ public class WriteToKafka {
     // We connect to NEW_SAMPLE and NEW_PREROLL because either can come up
     // as sources of data, although usually just one does.
     sink.set("emit-signals", true);
+//    sink.set("blocksize", 65536);
+    sink.set("blocksize", 4096);
+    sink.set("max-lateness", 100000);
     // sync=false lets us run the pipeline faster than real (based on the file)
     // time
     sink.set("sync", false);
-    sink.set("max-buffers", 2000);
     sink.connect(new AppSink.NEW_SAMPLE() {
       @Override
       public FlowReturn newSample(AppSink elem) {
@@ -111,7 +113,7 @@ public class WriteToKafka {
          */
 
     Bin bin = Gst.parseBinFromDescription(
-        "autovideosrc ! capsfilter caps=video/x-raw,width=640,height=480 ! x264enc ",
+        "autovideosrc ! capsfilter caps=video/x-raw,width=640,height=480 ! videorate ! video/x-raw,framerate=24/1 ! x264enc ! queue",
         true);
 
     pipe.addMany(bin, sink);
