@@ -90,13 +90,11 @@ public class WriteToKafka {
         Sample sample = elem.pullPreroll();
         ByteBuffer bytes = sample.getBuffer().map(false);
         try {
-          while (bytes.hasRemaining()) {
-            int copy = Math.min(bytes.remaining(), 2000);
-            byte[] buf = new byte[copy];
-            bytes.get(buf);
-            kafkaProducer.send("live-stream", buf);
-            System.out.println("Writing " + copy + " to cluster");
-          }
+          int copy = bytes.remaining();
+          byte[] buf = new byte[copy];
+          bytes.get(buf);
+          kafkaProducer.send("live-stream", buf);
+          System.out.println("Writing " + copy + " to cluster");
         } catch (Exception e) {
           System.err.println(e);
         }

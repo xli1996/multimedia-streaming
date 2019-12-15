@@ -36,7 +36,7 @@ public class ReadFromKafka {
     kafkaConsumer
         .initialize("ec2-34-217-2-237.us-west-2.compute.amazonaws.com:9093", topic, "hackday");
     kafkaConsumer.seekToEnd(topic, 0);
-//        kafkaConsumer.seek(topic, 0, 0);
+//    kafkaConsumer.seek(topic, 0, 0);
     // get the output stream from the socket.
     Gst.init();
 
@@ -58,7 +58,7 @@ public class ReadFromKafka {
 
     ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
     ScheduledFuture<?> scheduledFuture = ses
-        .scheduleAtFixedRate(kafkaPolling, 0, 100, TimeUnit.MILLISECONDS);
+        .scheduleAtFixedRate(kafkaPolling, 0, 30, TimeUnit.MILLISECONDS);
 
     final MainLoop loop = new MainLoop();
     pipe = new Pipeline();
@@ -91,7 +91,6 @@ public class ReadFromKafka {
     source.connect(new AppSrc.NEED_DATA() {
 
       final int[] offsetWithinRecord = new int[]{0};
-      ;
 
       @Override
       public void needData(AppSrc elem, int size) {
@@ -171,5 +170,4 @@ public class ReadFromKafka {
 
     scheduledFuture.cancel(true);
   }
-
 }
